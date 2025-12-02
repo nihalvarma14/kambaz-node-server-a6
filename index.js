@@ -16,13 +16,31 @@ const PORT = process.env.PORT || 4000;
 // Connect to MongoDB
 connectDB();
 
-// IMPORTANT: CORS must be before other middleware
+// CORS Configuration - MUST BE FIRST
+const allowedOrigins = [
+  'http://localhost:3000',
+  process.env.CLIENT_URL,
+  // Add your Vercel URL here when you have it
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Handle preflight requests
+app.options('*', cors());
 
 app.use(express.json());
 
@@ -32,9 +50,9 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Set to false for local development (http)
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
   }
 }));
@@ -65,4 +83,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📡 Client URL: ${process.env.CLIENT_URL}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
 });
