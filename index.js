@@ -16,11 +16,13 @@ const PORT = process.env.PORT || 4000;
 // Connect to MongoDB
 connectDB();
 
-// CORS Configuration - MUST BE FIRST
+// CORS Configuration - Allow multiple Vercel URLs
 const allowedOrigins = [
   'http://localhost:3000',
-  process.env.CLIENT_URL,
-  // Add your Vercel URL here when you have it
+  'https://kambaz-next-js-fqd8-git-a6-nihalvarma14s-projects.vercel.app',
+  'https://kambaz-next-js-fqd8-mmcw6tyd4-nihalvarma14s-projects.vercel.app',
+  'https://kambaz-next-js-fqd8.vercel.app',
+  process.env.CLIENT_URL
 ].filter(Boolean);
 
 app.use(cors({
@@ -28,18 +30,21 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // Check if origin is in allowed list or matches vercel.app domain
+    if (allowedOrigins.some(allowed => origin.includes(allowed)) || origin.includes('vercel.app')) {
       callback(null, true);
     } else {
+      console.log('❌ Blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['Set-Cookie']
 }));
 
-// Handle preflight requests
+// Handle preflight
 app.options('*', cors());
 
 app.use(express.json());
@@ -50,16 +55,16 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: true, // Required for cross-domain
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
+    sameSite: 'none', // Required for cross-domain
+    maxAge: 1000 * 60 * 60 * 24 * 7
   }
 }));
 
 // Logging middleware
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
+  console.log(`${req.method} ${req.path} - Origin: ${req.headers.origin}`);
   next();
 });
 
@@ -71,10 +76,13 @@ app.use('/api/assignments', assignmentsRoutes);
 
 // Health check
 app.get('/', (req, res) => {
-  res.json({ message: 'Kambaz API Server is running!' });
+  res.json({ 
+    message: 'Kambaz API Server is running!',
+    timestamp: new Date().toISOString()
+  });
 });
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
@@ -82,6 +90,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📡 Client URL: ${process.env.CLIENT_URL}`);
+  console.log(`📡 Allowed origins:`, allowedOrigins);
   console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
 });
